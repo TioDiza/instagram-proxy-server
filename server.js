@@ -1,4 +1,4 @@
-// server.js (Versão API-Only com Proxy de Imagem)
+// server.js (Versão Final com Proxy de Imagem)
 
 // 1. Importar as bibliotecas necessárias
 import express from 'express';
@@ -12,13 +12,13 @@ const PORT = process.env.PORT || 3001;
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
 // 2. Habilitar o CORS para todas as rotas
-// Isso permite que seu frontend acesse esta API sem erros de CORS.
 app.use(cors());
 
 // =====================================================================
 // ROTA PRINCIPAL: BUSCAR DADOS DO PERFIL DO INSTAGRAM
 // =====================================================================
 app.get("/perfil/:usuario", async (req, res) => {
+  // ... (código da rota de perfil, sem alterações)
   const usuario = req.params.usuario;
 
   if (!APIFY_TOKEN) {
@@ -38,7 +38,6 @@ app.get("/perfil/:usuario", async (req, res) => {
     console.log("✅ Busca na Apify concluída com sucesso.");
 
     if (response.data && response.data.length > 0) {
-      // Retorna o primeiro resultado encontrado
       res.json(response.data[0]);
     } else {
       res.status(404).json({ erro: `Perfil "${usuario}" não encontrado ou a API não retornou dados.` });
@@ -50,36 +49,27 @@ app.get("/perfil/:usuario", async (req, res) => {
   }
 });
 
-
 // =====================================================================
 // NOVA ROTA: PROXY PARA IMAGENS DO INSTAGRAM
-// Esta rota resolve o problema de CORS ao carregar a foto do perfil.
+// Esta rota precisa estar presente no seu servidor!
 // =====================================================================
 app.get('/image-proxy', async (req, res) => {
   try {
-    // 1. Pega a URL da imagem do parâmetro de consulta 'url'
     const imageUrl = req.query.url;
 
-    // 2. Validação: se a URL não for fornecida, retorna um erro
     if (!imageUrl) {
       return res.status(400).send('A URL da imagem é obrigatória.');
     }
 
     console.log(`🖼️  Recebendo requisição de proxy para a imagem: ${imageUrl}`);
 
-    // 3. Faz a requisição para a URL da imagem usando axios
     const response = await axios({
       method: 'get',
       url: imageUrl,
-      responseType: 'stream' // MUITO IMPORTANTE: Resposta como um fluxo de dados
+      responseType: 'stream'
     });
 
-    // 4. Define o cabeçalho 'Content-Type' da resposta para ser o mesmo da imagem original
-    // Isso garante que o navegador saiba que está recebendo uma imagem (ex: image/jpeg)
     res.setHeader('Content-Type', response.headers['content-type']);
-
-    // 5. Envia o fluxo da imagem diretamente para o frontend
-    // 'pipe' é uma forma eficiente de transferir os dados sem carregá-los na memória do servidor
     response.data.pipe(res);
 
   } catch (error) {
@@ -87,7 +77,6 @@ app.get('/image-proxy', async (req, res) => {
     res.status(500).send('Ocorreu um erro ao processar a imagem.');
   }
 });
-
 
 // Roda o servidor
 app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT} com proxy de imagem ativado.`));
