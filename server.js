@@ -1,32 +1,23 @@
-// server.js (Versão API-Only)
+// server.js (Versão API-Only com Proxy de Imagem)
 
 // 1. Importar as bibliotecas necessárias
 import express from 'express';
 import axios from 'axios';
-import cors from 'cors'; // 👈 IMPORTAR O PACOTE CORS
+import cors from 'cors';
 
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// ✅ PASSO CRÍTICO: Pegar sua chave de API das variáveis de ambiente
+// ✅ Chave de API das variáveis de ambiente
 const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
 // 2. Habilitar o CORS para todas as rotas
-// Isso dirá ao navegador "É seguro permitir que outros sites acessem esta API"
-app.use(cors()); // 👈 USAR O MIDDLEWARE CORS
+// Isso permite que seu frontend acesse esta API sem erros de CORS.
+app.use(cors());
 
 // =====================================================================
-// DICA DE PRODUÇÃO: Para mais segurança, você pode permitir apenas o domínio 
-// do seu frontend em vez de todo mundo ('*'). Fica assim:
-//
-// const corsOptions = {
-//   origin: 'https://seu-site-frontend.com' // Coloque a URL do seu frontend aqui
-// };
-// app.use(cors(corsOptions));
+// ROTA PRINCIPAL: BUSCAR DADOS DO PERFIL DO INSTAGRAM
 // =====================================================================
-
-
-// 3. Rota da API que seu frontend vai chamar
 app.get("/perfil/:usuario", async (req, res) => {
   const usuario = req.params.usuario;
 
@@ -39,7 +30,7 @@ app.get("/perfil/:usuario", async (req, res) => {
 
   try {
     console.log(`🚀 Iniciando busca para o usuário: ${usuario}`);
-    
+
     const response = await axios.post(apifyApiUrl, {
         "usernames": [usuario]
     });
@@ -47,6 +38,7 @@ app.get("/perfil/:usuario", async (req, res) => {
     console.log("✅ Busca na Apify concluída com sucesso.");
 
     if (response.data && response.data.length > 0) {
+      // Retorna o primeiro resultado encontrado
       res.json(response.data[0]);
     } else {
       res.status(404).json({ erro: `Perfil "${usuario}" não encontrado ou a API não retornou dados.` });
@@ -58,5 +50,44 @@ app.get("/perfil/:usuario", async (req, res) => {
   }
 });
 
+
+// =====================================================================
+// NOVA ROTA: PROXY PARA IMAGENS DO INSTAGRAM
+// Esta rota resolve o problema de CORS ao carregar a foto do perfil.
+// =====================================================================
+app.get('/image-proxy', async (req, res) => {
+  try {
+    // 1. Pega a URL da imagem do parâmetro de consulta 'url'
+    const imageUrl = req.query.url;
+
+    // 2. Validação: se a URL não for fornecida, retorna um erro
+    if (!imageUrl) {
+      return res.status(400).send('A URL da imagem é obrigatória.');
+    }
+
+    console.log(`🖼️  Recebendo requisição de proxy para a imagem: ${imageUrl}`);
+
+    // 3. Faz a requisição para a URL da imagem usando axios
+    const response = await axios({
+      method: 'get',
+      url: imageUrl,
+      responseType: 'stream' // MUITO IMPORTANTE: Resposta como um fluxo de dados
+    });
+
+    // 4. Define o cabeçalho 'Content-Type' da resposta para ser o mesmo da imagem original
+    // Isso garante que o navegador saiba que está recebendo uma imagem (ex: image/jpeg)
+    res.setHeader('Content-Type', response.headers['content-type']);
+
+    // 5. Envia o fluxo da imagem diretamente para o frontend
+    // 'pipe' é uma forma eficiente de transferir os dados sem carregá-los na memória do servidor
+    response.data.pipe(res);
+
+  } catch (error) {
+    console.error(`❌ Erro ao fazer proxy da imagem: ${error.message}`);
+    res.status(500).send('Ocorreu um erro ao processar a imagem.');
+  }
+});
+
+
 // Roda o servidor
-app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT} com proxy de imagem ativado.`));
