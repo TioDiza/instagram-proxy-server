@@ -1,18 +1,15 @@
 {
-  "name": "instagram-server-teste",
+  "name": "instagram-profile-viewer",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Um backend para buscar dados do Instagram via Apify",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
   "dependencies": {
-    "dotenv": "^17.2.3",
-    "express": "^5.1.0",
-    "node-fetch": "^3.3.2"
+    "axios": "^1.6.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
   }
 }

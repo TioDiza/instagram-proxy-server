@@ -1,36 +1,62 @@
-import express from "express";
-import fetch from "node-fetch";
+// server.js (Versão API-Only)
+
+// 1. Importar as bibliotecas necessárias
+import express from 'express';
+import axios from 'axios';
+import cors from 'cors'; // 👈 IMPORTAR O PACOTE CORS
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3001;
 
-// Permitir que qualquer site acesse
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  next();
-});
+// ✅ PASSO CRÍTICO: Pegar sua chave de API das variáveis de ambiente
+const APIFY_TOKEN = process.env.APIFY_TOKEN;
 
-// Rota principal: busca perfil do Instagram via API
+// 2. Habilitar o CORS para todas as rotas
+// Isso dirá ao navegador "É seguro permitir que outros sites acessem esta API"
+app.use(cors()); // 👈 USAR O MIDDLEWARE CORS
+
+// =====================================================================
+// DICA DE PRODUÇÃO: Para mais segurança, você pode permitir apenas o domínio 
+// do seu frontend em vez de todo mundo ('*'). Fica assim:
+//
+// const corsOptions = {
+//   origin: 'https://seu-site-frontend.com' // Coloque a URL do seu frontend aqui
+// };
+// app.use(cors(corsOptions));
+// =====================================================================
+
+
+// 3. Rota da API que seu frontend vai chamar
 app.get("/perfil/:usuario", async (req, res) => {
   const usuario = req.params.usuario;
-  // URL e parâmetro de usuário ATUALIZADOS!
-  const url = `https://instagram-scraper-stable-api.p.rapidapi.com/ig_get_fb_profile_hover.php?username_or_url=${usuario}`;
+
+  if (!APIFY_TOKEN) {
+    console.error("ERRO GRAVE: A variável de ambiente APIFY_TOKEN não foi definida!");
+    return res.status(500).json({ erro: "Configuração do servidor incompleta." });
+  }
+
+  const apifyApiUrl = `https://api.apify.com/v2/acts/apify~instagram-profile-scraper/run-sync-get-dataset-items?token=${APIFY_TOKEN}`;
 
   try {
-    const resposta = await fetch(url, {
-      headers: {
-        "x-rapidapi-key": "b2611f32c1mshb06ddd7d92dfacep18cd9fjsn21844707bffe",
-        "x-rapidapi-host": "instagram-scraper-stable-api.p.rapidapi.com" // HOST ATUALIZADO!
-      }
+    console.log(`🚀 Iniciando busca para o usuário: ${usuario}`);
+    
+    const response = await axios.post(apifyApiUrl, {
+        "usernames": [usuario]
     });
 
-    const dados = await resposta.json();
-    res.json(dados);
-  } catch (erro) {
-    console.error("Erro na rota /perfil/:usuario:", erro);
-    res.status(500).json({ erro: "Erro ao buscar perfil" });
+    console.log("✅ Busca na Apify concluída com sucesso.");
+
+    if (response.data && response.data.length > 0) {
+      res.json(response.data[0]);
+    } else {
+      res.status(404).json({ erro: `Perfil "${usuario}" não encontrado ou a API não retornou dados.` });
+    }
+
+  } catch (error) {
+    console.error("❌ Erro ao chamar a API da Apify:", error.response ? error.response.data : error.message);
+    res.status(500).json({ erro: "Ocorreu um erro no servidor ao tentar buscar os dados." });
   }
 });
 
 // Roda o servidor
-app.listen(PORT, () => console.log(`✅ Servidor rodando em http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ Servidor rodando na porta ${PORT}`));
